@@ -16,7 +16,9 @@ import (
 )
 
 var (
-	ErrCannotParse error = errors.New("Cannot parse metric")
+	ErrCannotParse         error = errors.New("Cannot parse metric")
+	ErrNoSuchMetric        error = errors.New("No such metric")
+	ErrSomeMetricsNotFound error = errors.New("Some metrics not found")
 )
 
 type MetricsIndex struct {
@@ -221,10 +223,23 @@ func (mi *MetricsIndex) GetAllTagValuesIterator(tagNameStr string) (*TagValueIte
 	return nil, nil
 }
 
-func (mi *MetricsIndex) GetMetricNameByID(id types.MetricID) (string, error) {
-	return "", nil
+func (mi *MetricsIndex) GetMetricNameByID(metricID types.MetricID) (string, error) {
+	metric, ok := mi.MetricIDToMetric.Get(metricID)
+	if !ok {
+		return "", ErrNoSuchMetric
+	}
+	return metric.Serialize(), nil
 }
 
-func (mi *MetricsIndex) GetMetricsNamesByIDs(ids []types.MetricID) ([]string, error) {
-	return nil, nil
+func (mi *MetricsIndex) GetMetricsNamesByIDs(metricIDs []types.MetricID) ([]string, error) {
+	metricStrs := make([]string, len(metricIDs))
+	var errRes error
+	for i, metricID := range metricIDs {
+		metricStr, err := mi.GetMetricNameByID(metricID)
+		if err != nil {
+			errRes = ErrSomeMetricsNotFound
+		}
+		metricStrs[i] = metricStr
+	}
+	return metricStrs, errRes
 }
