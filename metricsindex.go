@@ -164,11 +164,28 @@ func (mi *MetricsIndex) GetMetricIDsIteratorByTag(tagNameStr, tagValueStr string
 	return nil, nil
 }
 
+// GetCardinalityByTag returns total number of metrics which matches
+// given condition.
+// It returns 0 if there is no such tagNameStr:tagValueStr combination
 func (mi *MetricsIndex) GetCardinalityByTag(tagNameStr, tagValueStr string) int {
+	tnvid := types.TagNameValue{
+		TagName:  types.TagName(tagNameStr),
+		TagValue: types.TagValue(tagValueStr),
+	}.ID()
+	if v, ok := mi.TagNameValueIDToMetricIDs.Get(tnvid); ok {
+		return v.Len()
+	}
 	return 0
 }
 
+// GetCardinalityByTagName returns total number of metric which has
+// given tag.
+// It returns 0 if there is no such tagNameStr in the index
 func (mi *MetricsIndex) GetCardinalityByTagName(tagNameStr string) int {
+	tnid := types.TagName(tagNameStr).ID()
+	if v, ok := mi.TagNameIDToMetricIDs.Get(tnid); ok {
+		return v.Len()
+	}
 	return 0
 }
 
