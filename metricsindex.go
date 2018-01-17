@@ -5,15 +5,13 @@ import (
 	"io"
 	"strings"
 
-	"github.com/spuzirev/metricsindex/trees/metric_ids"
-
-	"github.com/spuzirev/metricsindex/trees/tag_values"
-
 	"github.com/spuzirev/metricsindex/trees/metric_id_to_metric"
+	"github.com/spuzirev/metricsindex/trees/metric_ids"
 	"github.com/spuzirev/metricsindex/trees/tag_name_id_to_metric_ids"
 	"github.com/spuzirev/metricsindex/trees/tag_name_id_to_tag_values"
 	"github.com/spuzirev/metricsindex/trees/tag_name_value_id_to_metric_ids"
 	"github.com/spuzirev/metricsindex/trees/tag_names"
+	"github.com/spuzirev/metricsindex/trees/tag_values"
 	"github.com/spuzirev/metricsindex/types"
 )
 
@@ -260,10 +258,39 @@ func (mi *MetricsIndex) GetAllTagNamesIterator() (*TagNameIterator, error) {
 	return nil, nil
 }
 
-// TODO: write description
+// GetTagValues return slice of strings representing all possible
+// values for given tagNameStr in the index
 func (mi *MetricsIndex) GetTagValues(tagNameStr, prefix string) []string {
-	// TODO: write implementation
-	return nil
+	tnid := types.TagName(tagNameStr).ID()
+
+	tagValueStrs := make([]string, 0)
+	var err error
+	var e *tag_values.Enumerator
+	var tagValues *tag_values.Tree
+	var tagValue types.TagValue
+	var ok bool
+
+	// if no such tag return empty slice
+	if tagValues, ok = mi.TagNameIDToTagValues.Get(tnid); !ok {
+		return tagValueStrs
+	}
+
+	e, _ = tagValues.Seek(types.TagValue(prefix))
+	defer e.Close()
+	for {
+		tagValue, _, err = e.Next()
+		if err == io.EOF {
+			break
+		}
+		tagValueStr := string(tagValue)
+		if strings.HasPrefix(tagValueStr, prefix) {
+			tagValueStrs = append(tagValueStrs, tagValueStr)
+		} else {
+			break
+		}
+
+	}
+	return tagValueStrs
 }
 
 // TODO: write description
@@ -272,10 +299,9 @@ func (mi *MetricsIndex) GetTagValuesIterator(tagNameStr, prefix string) (*TagVal
 	return nil, nil
 }
 
-// TODO: write description
+// GetAllTagValues is a shortcut for GetTagValues(tagNameStr, "")
 func (mi *MetricsIndex) GetAllTagValues(tagNameStr string) []string {
-	// TODO: write implementation
-	return nil
+	return mi.GetTagValues(tagNameStr, "")
 }
 
 // TODO: write description
