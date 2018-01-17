@@ -1,10 +1,15 @@
 package types
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
 	"github.com/OneOfOne/xxhash"
+)
+
+var (
+	ErrCannotParseMetricName error = errors.New("Cannot parse metric name")
 )
 
 type Metric struct {
@@ -43,4 +48,24 @@ func (m *Metric) Hash() uint64 {
 
 func (m *Metric) CalcMetricID() MetricID {
 	return MetricID(m.Hash())
+}
+
+func Parse(metricStr string) (*Metric, error) {
+	tokens := strings.Split(metricStr, ";")
+	name := tokens[0]
+	tags := make(map[string]string)
+	if len(tokens) > 1 {
+		tokens = tokens[1:]
+		for _, token := range tokens {
+			tntv := strings.Split(token, "=")
+			if len(tntv) != 2 {
+				return nil, ErrCannotParseMetricName
+			}
+			tags[tntv[0]] = tntv[1]
+		}
+	}
+	return &Metric{
+		Name: name,
+		Tags: tags,
+	}, nil
 }
