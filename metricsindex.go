@@ -19,6 +19,12 @@ var (
 	// ErrNoSuchMetric represents situation when metric not found
 	ErrNoSuchMetric = errors.New("No such metric")
 
+	// ErrNoSuchTag represents situation when tag not found
+	ErrNoSuchTag = errors.New("No such tag")
+
+	// ErrNoSuchTagNameValue represents situation when tagName:tagValue not found
+	ErrNoSuchTagNameValue = errors.New("No such tagName:tagValue")
+
 	// ErrSomeMetricsNotFound represents situation when some of requested
 	// metrics not found
 	ErrSomeMetricsNotFound = errors.New("Some metrics not found")
@@ -57,30 +63,74 @@ func NewMetricsIndex() *MetricsIndex {
 }
 
 // MetricIDIterator is iterator over type.MetricID
-type MetricIDIterator struct{}
+type MetricIDIterator struct {
+	e *metric_ids.Enumerator
+}
 
 // Next returns item if it exists and moves to next position
 // If there is no item to return err == io.EOF is returned
 func (midi *MetricIDIterator) Next() (types.MetricID, error) {
-	return types.MetricID(0), nil
+	k, _, err := midi.e.Next()
+	return k, err
+}
+
+// Close closes the MetricIDIterator
+func (midi *MetricIDIterator) Close() {
+	midi.e.Close()
 }
 
 // TagNameIterator is iterator over type.TagName
-type TagNameIterator struct{}
+type TagNameIterator struct {
+	e       *tag_names.Enumerator
+	filter  func(k types.TagName) bool
+	eofSent bool
+}
 
 // Next returns item if it exists and moves to next position
 // If there is no item to return err == io.EOF is returned
 func (tni *TagNameIterator) Next() (string, error) {
-	return "", nil
+	if tni.eofSent {
+		return "", io.EOF
+	}
+	k, _, err := tni.e.Next()
+	if !tni.filter(k) {
+		tni.eofSent = true
+		return "", io.EOF
+	}
+	return string(k), err
+}
+
+// Close closes TagNameIterator
+func (tni *TagNameIterator) Close() {
+	tni.e.Close()
+	tni.eofSent = true
 }
 
 // TagValueIterator is iterator over type.TagValue
-type TagValueIterator struct{}
+type TagValueIterator struct {
+	e       *tag_values.Enumerator
+	filter  func(k types.TagValue) bool
+	eofSent bool
+}
 
 // Next returns item if it exists and moves to next position
 // If there is no item to return err == io.EOF is returned
 func (tvi *TagValueIterator) Next() (string, error) {
-	return "", nil
+	if tvi.eofSent {
+		return "", io.EOF
+	}
+	k, _, err := tvi.e.Next()
+	if !tvi.filter(k) {
+		tvi.eofSent = true
+		return "", io.EOF
+	}
+	return string(k), err
+}
+
+// Close closes TagValueIterator
+func (tvi *TagValueIterator) Close() {
+	tvi.e.Close()
+	tvi.eofSent = true
 }
 
 // MetricExistsByMetricID returns true if metric with given metricID
@@ -185,10 +235,22 @@ func (mi *MetricsIndex) InsertMetricsBatch(metricsStr []string) error {
 	return nil
 }
 
-//TODO: add description
+// GetMetricIDsIteratorByTag returns MetricIDIterator for given
+// tagNameStr:tagValueStr pair
 func (mi *MetricsIndex) GetMetricIDsIteratorByTag(tagNameStr, tagValueStr string) (*MetricIDIterator, error) {
-	//TODO: add implementation
-	return nil, nil
+	tvid := types.TagNameValue{
+		TagName:  types.TagName(tagNameStr),
+		TagValue: types.TagValue(tagValueStr),
+	}.ID()
+	metricIDs, ok := mi.TagNameValueIDToMetricIDs.Get(tvid)
+	if !ok {
+		return nil, ErrNoSuchTagNameValue
+	}
+	e, _ := metricIDs.SeekFirst()
+	iterator := &MetricIDIterator{
+		e: e,
+	}
+	return iterator, nil
 }
 
 // GetCardinalityByTag returns total number of metrics which matches
@@ -243,8 +305,19 @@ func (mi *MetricsIndex) GetTagNames(prefix string) []string {
 	return res
 }
 
+// GetTagNamesIterator returns a *TagNameIterator which will return
+// all tag names with a given prefix
 func (mi *MetricsIndex) GetTagNamesIterator(prefix string) (*TagNameIterator, error) {
-	return nil, nil
+	e, _ := mi.TagNames.Seek(types.TagName(prefix))
+	iterator := &TagNameIterator{
+		e:       e,
+		eofSent: false,
+
+		filter: func(k types.TagName) bool {
+			return strings.HasPrefix(string(k), prefix)
+		},
+	}
+	return iterator, nil
 }
 
 // GetAllTagNames is shortcut for GetTagNames("")
@@ -252,10 +325,21 @@ func (mi *MetricsIndex) GetAllTagNames() []string {
 	return mi.GetTagNames("")
 }
 
-// TODO: write description
+// GetAllTagNamesIterator returns a *TagNameIterator over all tags in index
 func (mi *MetricsIndex) GetAllTagNamesIterator() (*TagNameIterator, error) {
-	// TODO: write implementation
-	return nil, nil
+	e, err := mi.TagNames.SeekFirst()
+	if err != nil {
+		return nil, err
+	}
+	iterator := &TagNameIterator{
+		e:       e,
+		eofSent: false,
+
+		filter: func(k types.TagName) bool {
+			return true
+		},
+	}
+	return iterator, nil
 }
 
 // GetTagValues return slice of strings representing all possible
@@ -293,10 +377,23 @@ func (mi *MetricsIndex) GetTagValues(tagNameStr, prefix string) []string {
 	return res
 }
 
-// TODO: write description
+// GetTagValuesIterator returns a *TagValueIterator which will return
+// all tag values with a given prefix for given tag
 func (mi *MetricsIndex) GetTagValuesIterator(tagNameStr, prefix string) (*TagValueIterator, error) {
-	// TODO: write implementation
-	return nil, nil
+	tagValues, ok := mi.TagNameIDToTagValues.Get(types.TagName(tagNameStr).ID())
+	if !ok {
+		return nil, ErrNoSuchTag
+	}
+	e, _ := tagValues.Seek(types.TagValue(prefix))
+	iterator := &TagValueIterator{
+		e:       e,
+		eofSent: false,
+
+		filter: func(k types.TagValue) bool {
+			return strings.HasPrefix(string(k), prefix)
+		},
+	}
+	return iterator, nil
 }
 
 // GetAllTagValues is a shortcut for GetTagValues(tagNameStr, "")
@@ -304,10 +401,22 @@ func (mi *MetricsIndex) GetAllTagValues(tagNameStr string) []string {
 	return mi.GetTagValues(tagNameStr, "")
 }
 
-// TODO: write description
+// GetAllTagValuesIterator returns a *TagNameIterator over all tag values for given tag
 func (mi *MetricsIndex) GetAllTagValuesIterator(tagNameStr string) (*TagValueIterator, error) {
-	// TODO: write implementation
-	return nil, nil
+	tagValues, ok := mi.TagNameIDToTagValues.Get(types.TagName(tagNameStr).ID())
+	if !ok {
+		return nil, ErrNoSuchTag
+	}
+	e, _ := tagValues.SeekFirst()
+	iterator := &TagValueIterator{
+		e:       e,
+		eofSent: false,
+
+		filter: func(k types.TagValue) bool {
+			return true
+		},
+	}
+	return iterator, nil
 }
 
 // GetMetricNameByID suddenly returns metric name by metricID
