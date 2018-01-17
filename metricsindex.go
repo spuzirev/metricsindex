@@ -2,6 +2,8 @@ package metricsindex
 
 import (
 	"errors"
+	"io"
+	"strings"
 
 	"github.com/spuzirev/metricsindex/trees/metric_ids"
 
@@ -16,11 +18,15 @@ import (
 )
 
 var (
-	ErrCannotParse         error = errors.New("Cannot parse metric")
-	ErrNoSuchMetric        error = errors.New("No such metric")
-	ErrSomeMetricsNotFound error = errors.New("Some metrics not found")
+	// ErrNoSuchMetric represents situation when metric not found
+	ErrNoSuchMetric = errors.New("No such metric")
+
+	// ErrSomeMetricsNotFound represents situation when some of requested
+	// metrics not found
+	ErrSomeMetricsNotFound = errors.New("Some metrics not found")
 )
 
+// MetricsIndex is the main Index object
 type MetricsIndex struct {
 	MetricIDToMetric          *metric_id_to_metric.Tree
 	TagNameIDToTagValues      *tag_name_id_to_tag_values.Tree
@@ -30,6 +36,7 @@ type MetricsIndex struct {
 	MetricIDToBool            map[types.MetricID]bool
 }
 
+// NewMetricsIndex is *MetricsIndex builder and initializer
 func NewMetricsIndex() *MetricsIndex {
 	return &MetricsIndex{
 		MetricIDToBool: make(map[types.MetricID]bool),
@@ -51,29 +58,42 @@ func NewMetricsIndex() *MetricsIndex {
 	}
 }
 
+// MetricIDIterator is iterator over type.MetricID
 type MetricIDIterator struct{}
 
+// Next returns item if it exists and moves to next position
+// If there is no item to return err == io.EOF is returned
 func (midi *MetricIDIterator) Next() (types.MetricID, error) {
 	return types.MetricID(0), nil
 }
 
+// TagNameIterator is iterator over type.TagName
 type TagNameIterator struct{}
 
+// Next returns item if it exists and moves to next position
+// If there is no item to return err == io.EOF is returned
 func (tni *TagNameIterator) Next() (string, error) {
 	return "", nil
 }
 
+// TagValueIterator is iterator over type.TagValue
 type TagValueIterator struct{}
 
+// Next returns item if it exists and moves to next position
+// If there is no item to return err == io.EOF is returned
 func (tvi *TagValueIterator) Next() (string, error) {
 	return "", nil
 }
 
+// MetricExistsByMetricID returns true if metric with given metricID
+// exists in the index, otherwise it returns false
 func (mi *MetricsIndex) MetricExistsByMetricID(metricID types.MetricID) bool {
 	_, ok := mi.MetricIDToBool[metricID]
 	return ok
 }
 
+//MetricExistsByMetricStr returns true if metric with given full name (with tags)
+// exists in the index, otherwise it returns false
 func (mi *MetricsIndex) MetricExistsByMetricStr(metricStr string) bool {
 	metric, err := types.ParseMetric(metricStr)
 	// if we unable to parse, that means we don't have that
@@ -84,6 +104,7 @@ func (mi *MetricsIndex) MetricExistsByMetricStr(metricStr string) bool {
 	return mi.MetricExistsByMetricID(metric.ID())
 }
 
+// insertMetric is internal method which inserts new types.Metric to index
 func (mi *MetricsIndex) insertMetric(metric *types.Metric) error {
 	metricID := metric.ID()
 	if mi.MetricExistsByMetricID(metricID) {
@@ -144,6 +165,8 @@ func (mi *MetricsIndex) insertMetric(metric *types.Metric) error {
 	return nil
 }
 
+// InsertMetric inserts new metric to index by metric string representation
+// it may return error if fails
 func (mi *MetricsIndex) InsertMetric(metricStr string) error {
 	metric, err := types.ParseMetric(metricStr)
 	if err != nil {
@@ -152,6 +175,8 @@ func (mi *MetricsIndex) InsertMetric(metricStr string) error {
 	return mi.insertMetric(metric)
 }
 
+// InsertMetricsBatch takes slice of metric strings representations
+// and inserts them to index
 func (mi *MetricsIndex) InsertMetricsBatch(metricsStr []string) error {
 	for _, metricStr := range metricsStr {
 		err := mi.InsertMetric(metricStr)
@@ -162,7 +187,9 @@ func (mi *MetricsIndex) InsertMetricsBatch(metricsStr []string) error {
 	return nil
 }
 
+//TODO: add description
 func (mi *MetricsIndex) GetMetricIDsIteratorByTag(tagNameStr, tagValueStr string) (*MetricIDIterator, error) {
+	//TODO: add implementation
 	return nil, nil
 }
 
@@ -191,49 +218,73 @@ func (mi *MetricsIndex) GetCardinalityByTagName(tagNameStr string) int {
 	return 0
 }
 
+// GetTagNames returns slice of strings representing all possible
+// names of tags in the index with prefix
+// If there is no metric with given prefix empty slice is returned
 func (mi *MetricsIndex) GetTagNames(prefix string) []string {
-	return nil
+	tagNameStrs := make([]string, 0)
+	var err error
+	var e *tag_names.Enumerator
+	var tagName types.TagName
+
+	e, _ = mi.TagNames.Seek(types.TagName(prefix))
+	defer e.Close()
+	for {
+		tagName, _, err = e.Next()
+		if err == io.EOF {
+			break
+		}
+		tagNameStr := string(tagName)
+		if strings.HasPrefix(tagNameStr, prefix) {
+			tagNameStrs = append(tagNameStrs, tagNameStr)
+		} else {
+			break
+		}
+
+	}
+	return tagNameStrs
 }
 
 func (mi *MetricsIndex) GetTagNamesIterator(prefix string) (*TagNameIterator, error) {
 	return nil, nil
 }
 
+// GetAllTagNames is shortcut for GetTagNames("")
 func (mi *MetricsIndex) GetAllTagNames() []string {
-	tagNameStrs := make([]string, mi.TagNames.Len())
-	if len(tagNameStrs) == 0 {
-		return tagNameStrs
-	}
-	var err error
-	var tagName types.TagName
-	i := 0
-	for e, _ := mi.TagNames.SeekFirst(); err == nil; tagName, _, err = e.Next() {
-		tagNameStrs[i] = string(tagName)
-		i++
-	}
-	return tagNameStrs
+	return mi.GetTagNames("")
 }
 
+// TODO: write description
 func (mi *MetricsIndex) GetAllTagNamesIterator() (*TagNameIterator, error) {
+	// TODO: write implementation
 	return nil, nil
 }
 
+// TODO: write description
 func (mi *MetricsIndex) GetTagValues(tagNameStr, prefix string) []string {
+	// TODO: write implementation
 	return nil
 }
 
+// TODO: write description
 func (mi *MetricsIndex) GetTagValuesIterator(tagNameStr, prefix string) (*TagValueIterator, error) {
+	// TODO: write implementation
 	return nil, nil
 }
 
+// TODO: write description
 func (mi *MetricsIndex) GetAllTagValues(tagNameStr string) []string {
+	// TODO: write implementation
 	return nil
 }
 
+// TODO: write description
 func (mi *MetricsIndex) GetAllTagValuesIterator(tagNameStr string) (*TagValueIterator, error) {
+	// TODO: write implementation
 	return nil, nil
 }
 
+// GetMetricNameByID suddenly returns metric name by metricID
 func (mi *MetricsIndex) GetMetricNameByID(metricID types.MetricID) (string, error) {
 	metric, ok := mi.MetricIDToMetric.Get(metricID)
 	if !ok {
@@ -242,6 +293,7 @@ func (mi *MetricsIndex) GetMetricNameByID(metricID types.MetricID) (string, erro
 	return metric.Serialize(), nil
 }
 
+// GetMetricsNamesByIDs is a batch version of GetMetricNameByID
 func (mi *MetricsIndex) GetMetricsNamesByIDs(metricIDs []types.MetricID) ([]string, error) {
 	metricStrs := make([]string, len(metricIDs))
 	var errRes error
