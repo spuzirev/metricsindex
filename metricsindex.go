@@ -17,17 +17,17 @@ import (
 
 var (
 	// ErrNoSuchMetric represents situation when metric not found
-	ErrNoSuchMetric = errors.New("No such metric")
+	ErrNoSuchMetric = errors.New("no such metric")
 
 	// ErrNoSuchTag represents situation when tag not found
-	ErrNoSuchTag = errors.New("No such tag")
+	ErrNoSuchTag = errors.New("no such tag")
 
 	// ErrNoSuchTagNameValue represents situation when tagName:tagValue not found
-	ErrNoSuchTagNameValue = errors.New("No such tagName:tagValue")
+	ErrNoSuchTagNameValue = errors.New("no such tagName:tagValue")
 
 	// ErrSomeMetricsNotFound represents situation when some of requested
 	// metrics not found
-	ErrSomeMetricsNotFound = errors.New("Some metrics not found")
+	ErrSomeMetricsNotFound = errors.New("some metrics not found")
 )
 
 // MetricsIndex is the main Index object
