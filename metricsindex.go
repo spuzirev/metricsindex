@@ -200,7 +200,18 @@ func (mi *MetricsIndex) GetTagNamesIterator(prefix string) (*TagNameIterator, er
 }
 
 func (mi *MetricsIndex) GetAllTagNames() []string {
-	return nil
+	tagNameStrs := make([]string, mi.TagNames.Len())
+	if len(tagNameStrs) == 0 {
+		return tagNameStrs
+	}
+	var err error
+	var tagName types.TagName
+	i := 0
+	for e, _ := mi.TagNames.SeekFirst(); err == nil; tagName, _, err = e.Next() {
+		tagNameStrs[i] = string(tagName)
+		i++
+	}
+	return tagNameStrs
 }
 
 func (mi *MetricsIndex) GetAllTagNamesIterator() (*TagNameIterator, error) {
