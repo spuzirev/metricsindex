@@ -46,11 +46,11 @@ func (m *Metric) Hash() uint64 {
 	return xxhash.Checksum64(m.SerializeToByteSlice())
 }
 
-func (m *Metric) CalcMetricID() MetricID {
+func (m *Metric) ID() MetricID {
 	return MetricID(m.Hash())
 }
 
-func Parse(metricStr string) (*Metric, error) {
+func ParseMetric(metricStr string) (*Metric, error) {
 	tokens := strings.Split(metricStr, ";")
 	name := tokens[0]
 	tags := make(map[string]string)
