@@ -220,7 +220,7 @@ func (mi *MetricsIndex) GetCardinalityByTagName(tagNameStr string) int {
 // names of tags in the index with prefix
 // If there is no metric with given prefix empty slice is returned
 func (mi *MetricsIndex) GetTagNames(prefix string) []string {
-	tagNameStrs := make([]string, 0)
+	res := make([]string, 0)
 	var err error
 	var e *tag_names.Enumerator
 	var tagName types.TagName
@@ -234,13 +234,13 @@ func (mi *MetricsIndex) GetTagNames(prefix string) []string {
 		}
 		tagNameStr := string(tagName)
 		if strings.HasPrefix(tagNameStr, prefix) {
-			tagNameStrs = append(tagNameStrs, tagNameStr)
+			res = append(res, tagNameStr)
 		} else {
 			break
 		}
 
 	}
-	return tagNameStrs
+	return res
 }
 
 func (mi *MetricsIndex) GetTagNamesIterator(prefix string) (*TagNameIterator, error) {
@@ -263,7 +263,7 @@ func (mi *MetricsIndex) GetAllTagNamesIterator() (*TagNameIterator, error) {
 func (mi *MetricsIndex) GetTagValues(tagNameStr, prefix string) []string {
 	tnid := types.TagName(tagNameStr).ID()
 
-	tagValueStrs := make([]string, 0)
+	res := make([]string, 0)
 	var err error
 	var e *tag_values.Enumerator
 	var tagValues *tag_values.Tree
@@ -272,7 +272,7 @@ func (mi *MetricsIndex) GetTagValues(tagNameStr, prefix string) []string {
 
 	// if no such tag return empty slice
 	if tagValues, ok = mi.TagNameIDToTagValues.Get(tnid); !ok {
-		return tagValueStrs
+		return res
 	}
 
 	e, _ = tagValues.Seek(types.TagValue(prefix))
@@ -284,13 +284,13 @@ func (mi *MetricsIndex) GetTagValues(tagNameStr, prefix string) []string {
 		}
 		tagValueStr := string(tagValue)
 		if strings.HasPrefix(tagValueStr, prefix) {
-			tagValueStrs = append(tagValueStrs, tagValueStr)
+			res = append(res, tagValueStr)
 		} else {
 			break
 		}
 
 	}
-	return tagValueStrs
+	return res
 }
 
 // TODO: write description
@@ -321,14 +321,14 @@ func (mi *MetricsIndex) GetMetricNameByID(metricID types.MetricID) (string, erro
 
 // GetMetricsNamesByIDs is a batch version of GetMetricNameByID
 func (mi *MetricsIndex) GetMetricsNamesByIDs(metricIDs []types.MetricID) ([]string, error) {
-	metricStrs := make([]string, len(metricIDs))
+	res := make([]string, len(metricIDs))
 	var errRes error
 	for i, metricID := range metricIDs {
 		metricStr, err := mi.GetMetricNameByID(metricID)
 		if err != nil {
 			errRes = ErrSomeMetricsNotFound
 		}
-		metricStrs[i] = metricStr
+		res[i] = metricStr
 	}
-	return metricStrs, errRes
+	return res, errRes
 }
