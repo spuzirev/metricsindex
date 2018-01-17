@@ -150,7 +150,13 @@ func (mi *MetricsIndex) InsertMetric(metricStr string) error {
 	return mi.insertMetric(metric)
 }
 
-func (mi *MetricsIndex) InsertMetricsBatch(metricStr []string) error {
+func (mi *MetricsIndex) InsertMetricsBatch(metricsStr []string) error {
+	for _, metricStr := range metricsStr {
+		err := mi.InsertMetric(metricStr)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
