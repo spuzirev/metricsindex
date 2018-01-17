@@ -71,6 +71,14 @@ func (mi *MetricsIndex) GetMetricIDsIteratorByTag(tagNameStr, tagValueStr string
 	return nil, nil
 }
 
+func (mi *MetricsIndex) GetCardinalityByTag(tagNameStr, tagValueStr string) int {
+	return 0
+}
+
+func (mi *MetricsIndex) GetCardinalityByTagName(tagNameStr string) int {
+	return 0
+}
+
 func (mi *MetricsIndex) GetTagNames(prefix string) []string {
 	return nil
 }
